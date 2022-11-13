@@ -5,16 +5,18 @@ using System.Threading.Tasks;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.ReplyMarkups;
-using Telegram.Bot.Args;
-using Telegram.Bot.Requests;
-using Telegram.Bot.Polling;
-using Telegram.Bot.Types.InlineQueryResults;
 using System.Collections.Generic;
+using Genius;
 
 namespace TelegramMusicBot
 {
     class BotManager
     {
+        public BotManager(string telegramToken, string geniusToken)
+        {
+            client = new TelegramBotClient(telegramToken);
+            GeniusManager.client = new GeniusClient(geniusToken);
+        }
         private enum DialogState
         {
             Greetings,
@@ -24,8 +26,7 @@ namespace TelegramMusicBot
 
         private static DialogState currentState;
 
-        const string token = "5695724139:AAF0Yf2HbpdEco6Y-k6C-1tFFEUD-T_GO7w";
-        public static ITelegramBotClient client { get; set; } = new TelegramBotClient(token);
+        public static ITelegramBotClient client { get; set; }
 
         public void StartBot()
         {
@@ -35,7 +36,6 @@ namespace TelegramMusicBot
 
             Console.ReadLine();
         }
-
 
         private static IReplyMarkup GetReplyMarkup(List<string> options)
         {
@@ -48,6 +48,7 @@ namespace TelegramMusicBot
 
             return new ReplyKeyboardMarkup(reply);
         }
+
         private async static Task ProcessGreetings(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
             var message = update.Message;
@@ -57,20 +58,26 @@ namespace TelegramMusicBot
                 switch (message.Text)
                 {
                     case "/start":
-                        await botClient.SendTextMessageAsync(message.Chat.Id, "Привет! Я бот. Могу помочь найти песню, а также много чего ещё.");
+                        await botClient.SendTextMessageAsync(message.Chat.Id, "Привет! Я бот. Могу помочь найти песню, а также много чего ещё.", replyMarkup: new ReplyKeyboardRemove());
 
-                        await botClient.SendTextMessageAsync(message.Chat.Id, "Что пожелаешь?", replyMarkup: GetReplyMarkup(
-                           new List<string> { "Найти песню", "[ V O I D ]" }));
+                        await SendOptionChoise(botClient, update, cancellationToken);
 
                         currentState = DialogState.OptionsChoise;
                         break;
 
                     default:
-                        Console.WriteLine($"Unsupported message! {message.Text}");
+                        ConsoleErrorOutput(message);
                         break;
                 }
             }
         }
+
+        private async static Task SendOptionChoise(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
+        {
+            await botClient.SendTextMessageAsync(update.Message.Chat.Id, "Что пожелаешь?", replyMarkup: GetReplyMarkup(
+               new List<string> { "Найти песню", "[ V O I D ]" }));
+        }
+
         private async static Task ProcessOptionChoise(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
             var message = update.Message;
@@ -92,7 +99,7 @@ namespace TelegramMusicBot
                         break;
 
                     default:
-                        Console.WriteLine($"Unsupported message! {message.Text}");
+                        ConsoleErrorOutput(message);
                         break;
                 }
             }
@@ -115,8 +122,7 @@ namespace TelegramMusicBot
 
                 await botClient.SendTextMessageAsync(message.Chat.Id, result);
 
-                await botClient.SendTextMessageAsync(message.Chat.Id, "Что пожелаешь?", replyMarkup: GetReplyMarkup(
-                            new List<string> { "Найти песню", "[ V O I D ]" }));
+                await SendOptionChoise(botClient, update, cancellationToken);
 
                 currentState = DialogState.OptionsChoise;
             }
@@ -126,8 +132,6 @@ namespace TelegramMusicBot
         {
             if (update.Type == Telegram.Bot.Types.Enums.UpdateType.Message)
             {
-                var message = update.Message;
-
                 switch (currentState)
                 {
                     case DialogState.Greetings:
@@ -142,6 +146,12 @@ namespace TelegramMusicBot
                 }
             }        
         }
+
+        private static void ConsoleErrorOutput(Message message)
+        {
+            Console.WriteLine($"Unsupported message: {message.Text} | Chat id: {message.Chat.Id} | Step: {currentState}");
+        }
+
         private static async Task Error(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
         {
             Console.WriteLine(JsonConvert.SerializeObject(exception));

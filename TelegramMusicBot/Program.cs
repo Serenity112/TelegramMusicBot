@@ -10,7 +10,10 @@ namespace TelegramMusicBot
     {
         static void Main(string[] args)
         {
-            var bot = new BotManager();
+            string telegramToken = "your_token";
+            string geniusToken = "your_token";
+
+            var bot = new BotManager(telegramToken, geniusToken);
 
             bot.StartBot();
         }
